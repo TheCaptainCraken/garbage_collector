@@ -1,5 +1,48 @@
 #include "garbage_collector.h"
 
+/*
+    Custom memory allocator.
+    This function works similar to malloc() from stdlib.h
+    It takes two arguments:
+        - master: this is an istance of a memoryMaster object used to store relevant information about heap memory.
+        - size: the size of the block the users desires.
+    It returns a void pointer to the first address of the memory created. If no memory is available it will return a NULL pointer.
+*/
+void* cralloc(memoryMaster* master, size_t size) {
+    blockHeader* freeListItem = master->free_blocks;
+    if (freeListItem != NULL) {
+        // If there is a used block that is now free to use and it is of the right size then use that.
+        for (freeListItem;freeListItem != NULL && freeListItem->max_size < size; freeListItem = freeListItem->next);
+        if (freeListItem != NULL) {
+            freeListItem->used_size = size;
+            addBlockToOccupiedList(master, freeListItem);
+            removeBlockFromFreeList(master, freeListItem);
+            return ((void*)freeListItem) + HEADER_SIZE;
+        }
+    }
+    // If there isn't a free block to use then create a new one.
+    blockHeader* newBlock = createNewBlock(size);
+    if (newBlock != NULL) {
+        addBlockToOccupiedList(master, newBlock);
+        return (void*)newBlock + HEADER_SIZE;
+    } else {
+        return NULL;
+    }
+}
+
+
+/*
+    Creates a new block of memory in the heap using sbrk().
+    Blocks of memory created by this function look like this:
+    ┌────────────┐
+    │   Header   │
+    ├────────────┤
+    │ Data Block │
+    └────────────┘
+    It takes one parameter:
+        - size: the size of the data the user needs to store. (no need to account for the header)
+    It will return a pointer to the new block or a NULL pointer if there is no memory available.
+*/
 static blockHeader* createNewBlock(size_t size) {
     size_t newBlockSize;
     if (size < MIN_SIZE_BLOCK) {
@@ -78,26 +121,6 @@ static void removeBlockFromOccupiedList(memoryMaster* master, blockHeader* block
     }
 }
 
-void* cralloc(memoryMaster* master, size_t size) {
-    blockHeader* freeListItem = master->free_blocks;
-    if (freeListItem != NULL) {
-        for (freeListItem;freeListItem != NULL && freeListItem->max_size < size; freeListItem = freeListItem->next);
-        if (freeListItem != NULL) {
-            freeListItem->used_size = size;
-            addBlockToOccupiedList(master, freeListItem);
-            removeBlockFromFreeList(master, freeListItem);
-            return ((void*)freeListItem) + HEADER_SIZE;
-        }
-    }
-    blockHeader* newBlock = createNewBlock(size);
-    if (newBlock != NULL) {
-        addBlockToOccupiedList(master, newBlock);
-        return (void*)newBlock + HEADER_SIZE;
-    } else {
-        return NULL;
-    }
-}
-
 memoryMaster* createMemoryMaster() {
     size_t size = sizeof(memoryMaster);
     memoryMaster* master = (memoryMaster*)sbrk(size);
@@ -132,6 +155,10 @@ void printMaster(memoryMaster* master) {
     printf("OCCUPIED LIST:\n");
     printList(master->occupied_blocks);
 }
+
+/*
+    Garbage collector
+*/
 
 static bool isAnOccupiedBlock(memoryMaster* master, blockHeader* block) {
     void* tmp = (void*)block - HEADER_SIZE;

@@ -26,6 +26,7 @@
 *
 */
 
+// Stores the header of each memory block.
 typedef struct blockHeader_s {
     size_t used_size;
     size_t max_size;
@@ -33,13 +34,23 @@ typedef struct blockHeader_s {
     struct blockHeader_s* next;
 }blockHeader;
 
+// Stores pointers to the head of each list.
 typedef struct memoryMaster_s {
     blockHeader* free_blocks;
     blockHeader* occupied_blocks;
 }memoryMaster;
 
+// Initializes the memoryMaster
 memoryMaster* createMemoryMaster();
+
+// Custom memory allocator. Works similar to malloc() but creates an header for each block. 
 void* cralloc(memoryMaster* master, size_t size);
+
+// Manual deallocator. Works similar to free().
 void unalive(memoryMaster* master, void* pointer);
+
+// Collects the garbage.
 size_t collect(memoryMaster* master);
+
+// Prints the state of the heap memory.
 void printMaster(memoryMaster* master);
